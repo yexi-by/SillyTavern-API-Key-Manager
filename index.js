@@ -62,7 +62,6 @@ const state = {
     renderTimer: null,
     repairTimer: null,
     observer: null,
-    lastNoticeAt: 0,
     modelRequests: new Set(),
     testingProviders: new Set(),
     drag: null,
@@ -594,7 +593,6 @@ function handleNativeClick(event) {
         event.preventDefault();
         event.stopImmediatePropagation();
         setPanelOpen(true);
-        notifyIntercepted();
         return;
     }
 
@@ -608,7 +606,6 @@ function handleNativeClick(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     setPanelOpen(true);
-    notifyIntercepted();
 }
 
 /**
@@ -634,7 +631,6 @@ function handleNativeMutationAttempt(event) {
         event.preventDefault();
         event.stopImmediatePropagation();
         scheduleRepair('native-api-page');
-        notifyIntercepted();
         return;
     }
 
@@ -649,7 +645,6 @@ function handleNativeMutationAttempt(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     scheduleRepair('native-control');
-    notifyIntercepted();
 }
 
 /**
@@ -767,7 +762,7 @@ function renderFloatingButton(settings) {
     }
 
     const activeProvider = getActiveProvider();
-    const label = settings.enabled ? (activeProvider ? getShortName(activeProvider.name) : 'LLM') : 'OFF';
+    const label = settings.enabled ? (activeProvider ? getShortName(activeProvider.name) : 'L') : 'O';
     const statusClass = !settings.enabled ? 'is-disabled' : activeProvider ? 'is-ready' : 'is-empty';
     button.setAttribute('data-akm-action', 'toggle-panel');
     button.setAttribute('aria-expanded', String(Boolean(settings.ui.panelOpen)));
@@ -1952,19 +1947,6 @@ function focusProviderForm(scope = 'settings') {
 }
 
 /**
- * 提示原生功能已由插件接管。
- */
-function notifyIntercepted() {
-    const now = Date.now();
-    if (now - state.lastNoticeAt < 2500) {
-        return;
-    }
-
-    state.lastNoticeAt = now;
-    notify('连接与密钥已由 API Key 管家接管。', 'info');
-}
-
-/**
  * 弹出确认框。
  * @param {string} title 标题。
  * @param {string} message 内容。
@@ -2253,16 +2235,17 @@ function uniqueModels(values) {
 /**
  * 生成悬浮球短名称。
  * @param {string} name 服务商名称。
- * @returns {string} 两到三个字符的短名称。
+ * @returns {string} 单字符短名称。
  */
 function getShortName(name) {
     const trimmed = String(name || '').trim();
     if (!trimmed) {
-        return 'AK';
+        return 'A';
     }
 
     const compact = trimmed.replace(/\s+/g, '');
-    return Array.from(compact).slice(0, 3).join('').toUpperCase();
+    const firstCharacter = Array.from(compact)[0] || 'A';
+    return /^[a-z]$/i.test(firstCharacter) ? firstCharacter.toUpperCase() : firstCharacter;
 }
 
 /**

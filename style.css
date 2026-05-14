@@ -39,8 +39,8 @@
     cursor: grab;
     display: inline-flex;
     font: inherit;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 800;
     height: 58px;
     justify-content: center;
     letter-spacing: 0;
@@ -81,8 +81,10 @@
 }
 
 .akm-fab-label {
-    max-width: 34px;
+    max-width: 24px;
+    min-width: 1ch;
     overflow: hidden;
+    text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
