@@ -422,13 +422,16 @@ function bindDragEvents() {
     window.addEventListener('resize', () => {
         const settings = ensureSettings();
         const root = document.getElementById('akm-root');
-        if (!root || !settings.ui.position) {
+        if (!root) {
             return;
         }
 
-        settings.ui.position = clampRootPosition(settings.ui.position.left, settings.ui.position.top, root);
-        applyRootPosition(root, settings);
-        saveSettingsDebounced();
+        if (settings.ui.position) {
+            settings.ui.position = clampRootPosition(settings.ui.position.left, settings.ui.position.top, root);
+            applyRootPosition(root, settings);
+            saveSettingsDebounced();
+        }
+        updatePanelPlacement(settings);
     });
 }
 
@@ -490,6 +493,7 @@ function moveFloatingDrag(event) {
     root.style.top = `${nextPosition.top}px`;
     root.style.right = 'auto';
     root.style.bottom = 'auto';
+    updatePanelPlacement(ensureSettings());
     event.preventDefault();
 }
 
@@ -735,6 +739,7 @@ function renderAll() {
     hideNativeManagers();
     renderFloatingButton(settings);
     renderPanel(settings);
+    updatePanelPlacement(settings);
     renderSettings(settings);
 }
 
@@ -1902,6 +1907,63 @@ function applyRootPosition(root, settings) {
 }
 
 /**
+ * 根据悬浮球位置摆放控制台面板，优先避免覆盖悬浮球并保证面板留在视口内。
+ * @param {typeof DEFAULT_SETTINGS} settings 扩展设置。
+ */
+function updatePanelPlacement(settings) {
+    const root = document.getElementById('akm-root');
+    const button = document.getElementById('akm-fab');
+    const panel = document.getElementById('akm-panel');
+    if (!root || !button || !panel || !settings.ui.panelOpen) {
+        return;
+    }
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = viewportWidth <= 720 ? 12 : 14;
+    const gap = viewportWidth <= 720 ? 10 : 14;
+    const buttonRect = button.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const maxPanelWidth = Math.max(0, viewportWidth - margin * 2);
+    const minPanelWidth = Math.min(290, maxPanelWidth);
+    const panelWidth = Math.min(Math.max(panelRect.width || minPanelWidth, minPanelWidth), maxPanelWidth);
+    const heightLimit = Math.max(120, Math.min(500, viewportHeight - margin * 2));
+    const preferredHeight = Math.min(Math.max(panel.scrollHeight || panelRect.height || 120, 120), heightLimit);
+
+    const availableAbove = Math.max(0, buttonRect.top - gap - margin);
+    const availableBelow = Math.max(0, viewportHeight - buttonRect.bottom - gap - margin);
+    const openBelow = availableBelow >= preferredHeight || availableBelow >= availableAbove;
+    const availableHeight = openBelow ? availableBelow : availableAbove;
+    const minimumUsefulHeight = Math.min(120, heightLimit);
+    const panelHeight = availableHeight >= minimumUsefulHeight
+        ? Math.max(minimumUsefulHeight, Math.min(preferredHeight, availableHeight))
+        : Math.min(preferredHeight, Math.max(48, availableHeight || heightLimit));
+
+    let top = openBelow
+        ? buttonRect.bottom + gap
+        : buttonRect.top - gap - panelHeight;
+    top = clampNumber(top, margin, Math.max(margin, viewportHeight - panelHeight - margin));
+
+    const availableLeft = Math.max(0, buttonRect.left - gap - margin);
+    const availableRight = Math.max(0, viewportWidth - buttonRect.right - gap - margin);
+    const openRight = availableRight >= panelWidth || availableRight >= availableLeft;
+    const horizontalPlacement = openRight ? 'right' : 'left';
+    let left = openRight
+        ? buttonRect.right + gap
+        : buttonRect.left - gap - panelWidth;
+    left = clampNumber(left, margin, Math.max(margin, viewportWidth - panelWidth - margin));
+
+    panel.dataset.akmPlacement = `${openBelow ? 'below' : 'above'}-${horizontalPlacement}`;
+    panel.style.left = `${Math.round(left)}px`;
+    panel.style.top = `${Math.round(top)}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+    panel.style.width = `${Math.round(panelWidth)}px`;
+    panel.style.maxHeight = `${Math.round(panelHeight)}px`;
+    panel.style.transformOrigin = `${openRight ? 'left' : 'right'} ${openBelow ? 'top' : 'bottom'}`;
+}
+
+/**
  * 把悬浮入口限制在视口内，避免拖出屏幕后无法找回。
  * @param {number} left 左侧像素。
  * @param {number} top 顶部像素。
@@ -1919,6 +1981,17 @@ function clampRootPosition(left, top, root) {
         left: Math.min(Math.max(Number(left) || margin, margin), maxLeft),
         top: Math.min(Math.max(Number(top) || margin, margin), maxTop),
     };
+}
+
+/**
+ * 把数值限制在指定区间内。
+ * @param {number} value 原始数值。
+ * @param {number} min 最小值。
+ * @param {number} max 最大值。
+ * @returns {number} 限制后的数值。
+ */
+function clampNumber(value, min, max) {
+    return Math.min(Math.max(value, min), max);
 }
 
 /**

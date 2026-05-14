@@ -93,13 +93,13 @@
     background: var(--akm-bg);
     border: 1px solid var(--akm-border);
     border-radius: 8px;
-    bottom: 74px;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
     display: none;
-    min-width: 290px;
+    max-height: min(500px, calc(100dvh - 28px));
+    min-width: min(290px, calc(100vw - 28px));
+    overflow: auto;
     padding: 14px;
-    position: absolute;
-    right: 0;
+    position: fixed;
     width: min(420px, calc(100vw - 28px));
 }
 
@@ -644,17 +644,9 @@
     }
 
     .akm-panel {
-        border-radius: 8px 8px 0 0;
-        bottom: auto;
-        max-height: min(70vh, 560px);
-        max-height: min(70dvh, 560px);
-        overflow: auto;
+        border-radius: 8px;
         padding-bottom: max(14px, env(safe-area-inset-bottom));
-        position: fixed;
-        right: 0;
-        top: 30vh;
-        top: 30dvh;
-        width: 100vw;
+        width: min(420px, calc(100vw - 24px));
     }
 
     .akm-panel-head {
