@@ -73,6 +73,7 @@ const state = {
  */
 export async function init() {
     ensureSettings();
+    installManagedInfoToastFilter();
     ensureShell();
     ensureSettingsView();
     bindUiEvents();
@@ -1972,6 +1973,27 @@ function notify(message, type = 'info') {
     }
 
     console.log(`[${DISPLAY_NAME}] ${message}`);
+}
+
+/**
+ * 过滤旧版监听器或原生事件链残留的接管提示，避免普通服务切换被低价值 toast 打断。
+ */
+function installManagedInfoToastFilter() {
+    if (!window.toastr?.info || window.toastr.__akmInfoToastFilterInstalled) {
+        return;
+    }
+
+    const originalInfo = window.toastr.info.bind(window.toastr);
+    window.toastr.info = (message, title, optionsOverride) => {
+        const normalizedMessage = String(message || '');
+        const normalizedTitle = String(title || '');
+        if (normalizedTitle === DISPLAY_NAME && normalizedMessage.includes('连接与密钥已由 API Key 管家接管')) {
+            return null;
+        }
+
+        return originalInfo(message, title, optionsOverride);
+    };
+    window.toastr.__akmInfoToastFilterInstalled = true;
 }
 
 /**
