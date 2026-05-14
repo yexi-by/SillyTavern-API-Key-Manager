@@ -3,10 +3,11 @@
     "loading_order": 99,
     "js": "index.js?v=0.3.4",
     "css": "style.css?v=0.3.4",
-    "author": "API Key 管家维护者",
+    "author": "yexi-by",
     "version": "0.3.4",
     "auto_update": true,
     "minimum_client_version": "1.18.0",
+    "homePage": "https://github.com/yexi-by/SillyTavern-API-Key-Manager",
     "hooks": {
         "activate": "init"
     }

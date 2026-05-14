@@ -23,7 +23,7 @@
 
 1. 在 SillyTavern 顶部栏打开 `扩展程序`。
 2. 进入 `Install Extension`。
-3. 粘贴本插件的 Git 仓库地址，例如 `<仓库地址>`。
+3. 粘贴本插件的 Git 仓库地址：`https://github.com/yexi-by/SillyTavern-API-Key-Manager`。
 4. 安装完成后刷新 SillyTavern。
 5. 在扩展程序设置页确认 `API Key 管家` 已启用。
 6. 通过右下角悬浮球打开 LLM 管理控制台，新增服务并填写名称、Base URL 与 API Key。

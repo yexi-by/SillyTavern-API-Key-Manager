@@ -22,7 +22,7 @@
 2. 把本目录作为仓库根目录提交。
 3. 检查 `manifest.json` 中的 `author`、`version`、`minimum_client_version` 是否符合当前发布。
 4. 推送到默认分支。
-5. 让用户在 SillyTavern 中进入 `扩展程序 -> Install Extension`，粘贴 `<仓库地址>` 安装。
+5. 让用户在 SillyTavern 中进入 `扩展程序 -> Install Extension`，粘贴 `https://github.com/yexi-by/SillyTavern-API-Key-Manager` 安装。
 
 ## 官方下载列表
 
@@ -36,7 +36,7 @@
     "type": "extension",
     "name": "API Key 管家",
     "description": "OpenAI-compatible LLM 服务、模型与 API Key 持久化管理控制台。",
-    "url": "<仓库地址>"
+    "url": "https://github.com/yexi-by/SillyTavern-API-Key-Manager"
 }
 ```
 
