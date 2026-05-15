@@ -451,6 +451,7 @@ function startFloatingDrag(event, handle) {
         return;
     }
 
+    const settings = ensureSettings();
     const rect = root.getBoundingClientRect();
     state.drag = {
         pointerId: event.pointerId,
@@ -460,6 +461,8 @@ function startFloatingDrag(event, handle) {
         startTop: rect.top,
         currentLeft: rect.left,
         currentTop: rect.top,
+        dockSide: settings.ui.panelOpen ? null : settings.ui.dockSide,
+        awakened: false,
         moved: false,
     };
 
@@ -491,6 +494,11 @@ function moveFloatingDrag(event) {
         state.drag.moved = true;
     }
 
+    if (state.drag.dockSide && !ensureSettings().ui.panelOpen) {
+        moveDockedHandle(event, root, deltaX, deltaY);
+        return;
+    }
+
     const nextPosition = clampRootPosition(state.drag.startLeft + deltaX, state.drag.startTop + deltaY, root);
     state.drag.currentLeft = nextPosition.left;
     state.drag.currentTop = nextPosition.top;
@@ -499,6 +507,40 @@ function moveFloatingDrag(event) {
     root.style.right = 'auto';
     root.style.bottom = 'auto';
     updatePanelPlacement(ensureSettings());
+    event.preventDefault();
+}
+
+/**
+ * 处理贴边竖条的滑动：横向内滑唤醒控制台，纵向滑动调整把手位置。
+ * @param {PointerEvent} event 指针事件。
+ * @param {HTMLElement} root 悬浮根节点。
+ * @param {number} deltaX 横向位移。
+ * @param {number} deltaY 纵向位移。
+ */
+function moveDockedHandle(event, root, deltaX, deltaY) {
+    const dockSide = state.drag?.dockSide;
+    if (!dockSide) {
+        return;
+    }
+
+    const inwardDelta = dockSide === 'left' ? deltaX : -deltaX;
+    if (inwardDelta >= 18 && Math.abs(deltaX) >= Math.max(10, Math.abs(deltaY) * 0.7)) {
+        state.drag.awakened = true;
+        const settings = ensureSettings();
+        settings.ui.panelOpen = true;
+        saveSettingsDebounced();
+        renderAll();
+        event.preventDefault();
+        return;
+    }
+
+    const nextPosition = getDockedRootPosition(dockSide, state.drag.startTop + deltaY, root);
+    state.drag.currentLeft = nextPosition.left;
+    state.drag.currentTop = nextPosition.top;
+    root.style.left = `${nextPosition.left}px`;
+    root.style.top = `${nextPosition.top}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
     event.preventDefault();
 }
 
@@ -520,18 +562,28 @@ function finishFloatingDrag(event) {
     const dragged = Boolean(state.drag.moved);
     const left = state.drag.currentLeft;
     const top = state.drag.currentTop;
+    const dockSide = state.drag.dockSide;
+    const awakened = Boolean(state.drag.awakened);
     state.drag = null;
     root?.classList.remove('akm-dragging');
+
+    if (awakened) {
+        state.suppressNextFabClick = true;
+        window.setTimeout(() => {
+            state.suppressNextFabClick = false;
+        }, 180);
+        return;
+    }
 
     if (!dragged) {
         return;
     }
 
     const settings = ensureSettings();
-    const dockSide = detectDockSide(left, root);
-    settings.ui.dockSide = dockSide;
-    settings.ui.position = dockSide
-        ? getDockedRootPosition(dockSide, top, root)
+    const nextDockSide = dockSide || detectDockSide(left, root);
+    settings.ui.dockSide = nextDockSide;
+    settings.ui.position = nextDockSide
+        ? getDockedRootPosition(nextDockSide, top, root)
         : { left, top };
     settings.ui.placement = 'custom';
     state.suppressNextFabClick = true;
@@ -1907,7 +1959,6 @@ async function setConsoleEnabled(enabled) {
  * @param {typeof DEFAULT_SETTINGS} settings 扩展设置。
  */
 function applyRootPosition(root, settings) {
-    root.style.setProperty('--akm-dock-offset', `${getDockOffset(root)}px`);
     const position = settings.ui.position;
     if (!position) {
         root.style.left = '';
@@ -1917,7 +1968,9 @@ function applyRootPosition(root, settings) {
         return;
     }
 
-    const nextPosition = clampRootPosition(position.left, position.top, root);
+    const nextPosition = settings.ui.dockSide
+        ? getDockedRootPosition(settings.ui.dockSide, position.top, root)
+        : clampRootPosition(position.left, position.top, root);
     root.style.left = `${nextPosition.left}px`;
     root.style.top = `${nextPosition.top}px`;
     root.style.right = 'auto';
@@ -2012,23 +2065,13 @@ function detectDockSide(left, root) {
  */
 function getDockedRootPosition(dockSide, top, root) {
     const margin = 8;
-    const width = Math.max(root.offsetWidth || 58, 58);
-    const clamped = clampRootPosition(0, top, root);
+    const width = Math.max(root.offsetWidth || 12, 12);
+    const height = Math.max(root.offsetHeight || 58, 58);
+    const maxTop = Math.max(margin, window.innerHeight - height - margin);
     return {
-        left: dockSide === 'left' ? margin : Math.max(margin, window.innerWidth - width - margin),
-        top: clamped.top,
+        left: dockSide === 'left' ? 0 : Math.max(0, window.innerWidth - width),
+        top: clampNumber(top, margin, maxTop),
     };
-}
-
-/**
- * 计算贴边收缩时隐藏到屏幕外的宽度。
- * @param {HTMLElement} root 悬浮根节点。
- * @returns {number} 收缩偏移像素。
- */
-function getDockOffset(root) {
-    const width = Math.max(root.offsetWidth || 58, 58);
-    const maxOffset = window.innerWidth <= 720 ? 24 : 28;
-    return Math.round(Math.min(maxOffset, width * 0.44));
 }
 
 /**

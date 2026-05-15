@@ -19,7 +19,6 @@
     top: calc(100vh - 76px - env(safe-area-inset-bottom));
     top: calc(100dvh - 76px - env(safe-area-inset-bottom));
     touch-action: none;
-    --akm-dock-offset: 0px;
     z-index: 5000;
 }
 
@@ -48,10 +47,14 @@
     min-width: 58px;
     padding: 0 10px;
     position: relative;
-    --akm-fab-dock-x: 0px;
     --akm-fab-hover-y: 0px;
-    transform: translateX(var(--akm-fab-dock-x)) translateY(var(--akm-fab-hover-y));
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, border-radius 220ms ease;
+    transform: translateY(var(--akm-fab-hover-y));
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        border-radius 220ms ease,
+        box-shadow 220ms ease,
+        transform 160ms ease;
 }
 
 .akm-fab:hover,
@@ -144,12 +147,41 @@
     opacity: 0.78;
 }
 
-#akm-root.akm-dock-left:not(.akm-open):not(.akm-dragging) .akm-fab {
-    --akm-fab-dock-x: calc(-1 * var(--akm-dock-offset));
+#akm-root.akm-dock-left:not(.akm-open) .akm-fab,
+#akm-root.akm-dock-right:not(.akm-open) .akm-fab {
+    aspect-ratio: auto;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    cursor: ew-resize;
+    height: 76px;
+    min-width: 24px;
+    overflow: hidden;
+    padding: 0;
+    width: 24px;
 }
 
-#akm-root.akm-dock-right:not(.akm-open):not(.akm-dragging) .akm-fab {
-    --akm-fab-dock-x: var(--akm-dock-offset);
+#akm-root.akm-dock-left:not(.akm-open) .akm-fab::before,
+#akm-root.akm-dock-right:not(.akm-open) .akm-fab::before {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.52);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    content: "";
+    height: 48px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px;
+}
+
+#akm-root.akm-dock-left:not(.akm-open) .akm-fab::before {
+    border-radius: 0 999px 999px 0;
+    left: 0;
+}
+
+#akm-root.akm-dock-right:not(.akm-open) .akm-fab::before {
+    border-radius: 999px 0 0 999px;
+    right: 0;
 }
 
 #akm-root.akm-dock-left:not(.akm-open) .akm-fab {
@@ -158,6 +190,13 @@
 
 #akm-root.akm-dock-right:not(.akm-open) .akm-fab {
     border-radius: 999px 0 0 999px;
+}
+
+#akm-root.akm-dock-left:not(.akm-open) .akm-fab-label,
+#akm-root.akm-dock-right:not(.akm-open) .akm-fab-label,
+#akm-root.akm-dock-left:not(.akm-open) .akm-fab-status,
+#akm-root.akm-dock-right:not(.akm-open) .akm-fab-status {
+    opacity: 0;
 }
 
 .akm-panel-head,
