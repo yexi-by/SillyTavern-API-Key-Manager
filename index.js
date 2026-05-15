@@ -2065,13 +2065,29 @@ function detectDockSide(left, root) {
  */
 function getDockedRootPosition(dockSide, top, root) {
     const margin = 8;
-    const width = Math.max(root.offsetWidth || 12, 12);
-    const height = Math.max(root.offsetHeight || 58, 58);
+    const dimensions = getDockedRootDimensions(root);
+    const width = dimensions.width;
+    const height = dimensions.height;
     const maxTop = Math.max(margin, window.innerHeight - height - margin);
     return {
         left: dockSide === 'left' ? 0 : Math.max(0, window.innerWidth - width),
         top: clampNumber(top, margin, maxTop),
     };
+}
+
+/**
+ * 获取贴边状态下悬浮入口的稳定尺寸，避免形态动画过程中的实时宽度干扰定位。
+ * @param {HTMLElement} root 悬浮根节点。
+ * @returns {{width: number, height: number}} 当前状态应占用的定位尺寸。
+ */
+function getDockedRootDimensions(root) {
+    const open = root.classList.contains('akm-open') || ensureSettings().ui.panelOpen;
+    if (open) {
+        const size = window.innerWidth <= 720 ? 54 : 58;
+        return { width: size, height: size };
+    }
+
+    return { width: 24, height: 76 };
 }
 
 /**
