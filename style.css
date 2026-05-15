@@ -19,6 +19,7 @@
     top: calc(100vh - 76px - env(safe-area-inset-bottom));
     top: calc(100dvh - 76px - env(safe-area-inset-bottom));
     touch-action: none;
+    --akm-dock-offset: 0px;
     z-index: 5000;
 }
 
@@ -47,14 +48,17 @@
     min-width: 58px;
     padding: 0 10px;
     position: relative;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    --akm-fab-dock-x: 0px;
+    --akm-fab-hover-y: 0px;
+    transform: translateX(var(--akm-fab-dock-x)) translateY(var(--akm-fab-hover-y));
+    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, border-radius 220ms ease;
 }
 
 .akm-fab:hover,
 .akm-fab:focus-visible {
     border-color: var(--akm-focus);
     outline: none;
-    transform: translateY(-1px);
+    --akm-fab-hover-y: -1px;
 }
 
 .akm-fab-status {
@@ -94,13 +98,29 @@
     border: 1px solid var(--akm-border);
     border-radius: 8px;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
-    display: none;
+    display: block;
     max-height: min(500px, calc(100dvh - 28px));
     min-width: min(290px, calc(100vw - 28px));
+    opacity: 0;
     overflow: auto;
     padding: 14px;
+    pointer-events: none;
     position: fixed;
+    transform: translateY(var(--akm-panel-offset-y, 8px)) scale(0.985);
+    transition:
+        opacity 180ms ease,
+        transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        visibility 0s linear 180ms;
+    visibility: hidden;
     width: min(420px, calc(100vw - 28px));
+}
+
+.akm-panel[data-akm-placement^="below"] {
+    --akm-panel-offset-y: -8px;
+}
+
+.akm-panel[data-akm-placement^="above"] {
+    --akm-panel-offset-y: 8px;
 }
 
 #akm-root.akm-dragging .akm-fab,
@@ -110,11 +130,34 @@
 }
 
 #akm-root.akm-open .akm-panel {
-    display: block;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition:
+        opacity 180ms ease,
+        transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        visibility 0s;
+    visibility: visible;
 }
 
 #akm-root.akm-disabled .akm-fab {
     opacity: 0.78;
+}
+
+#akm-root.akm-dock-left:not(.akm-open):not(.akm-dragging) .akm-fab {
+    --akm-fab-dock-x: calc(-1 * var(--akm-dock-offset));
+}
+
+#akm-root.akm-dock-right:not(.akm-open):not(.akm-dragging) .akm-fab {
+    --akm-fab-dock-x: var(--akm-dock-offset);
+}
+
+#akm-root.akm-dock-left:not(.akm-open) .akm-fab {
+    border-radius: 0 999px 999px 0;
+}
+
+#akm-root.akm-dock-right:not(.akm-open) .akm-fab {
+    border-radius: 999px 0 0 999px;
 }
 
 .akm-panel-head,
@@ -628,6 +671,16 @@
     }
     50% {
         opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #akm-root,
+    .akm-fab,
+    .akm-panel,
+    .akm-fab-status {
+        animation: none !important;
+        transition: none !important;
     }
 }
 

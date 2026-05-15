@@ -50,6 +50,7 @@ const DEFAULT_SETTINGS = {
         panelOpen: false,
         placement: 'bottom-right',
         position: null,
+        dockSide: null,
         settingsCollapsed: false,
     },
     lockNativeConnection: true,
@@ -121,6 +122,7 @@ function ensureSettings() {
         ...(settings.ui || {}),
     };
     settings.ui.position = normalizeSavedPosition(settings.ui.position);
+    settings.ui.dockSide = normalizeDockSide(settings.ui.dockSide);
     settings.ui.settingsCollapsed = Boolean(settings.ui.settingsCollapsed);
     settings.lockNativeConnection = settings.lockNativeConnection !== false;
 
@@ -428,6 +430,9 @@ function bindDragEvents() {
 
         if (settings.ui.position) {
             settings.ui.position = clampRootPosition(settings.ui.position.left, settings.ui.position.top, root);
+            if (settings.ui.dockSide) {
+                settings.ui.position = getDockedRootPosition(settings.ui.dockSide, settings.ui.position.top, root);
+            }
             applyRootPosition(root, settings);
             saveSettingsDebounced();
         }
@@ -507,6 +512,11 @@ function finishFloatingDrag(event) {
     }
 
     const root = document.getElementById('akm-root');
+    if (!root) {
+        state.drag = null;
+        return;
+    }
+
     const dragged = Boolean(state.drag.moved);
     const left = state.drag.currentLeft;
     const top = state.drag.currentTop;
@@ -518,13 +528,18 @@ function finishFloatingDrag(event) {
     }
 
     const settings = ensureSettings();
-    settings.ui.position = { left, top };
+    const dockSide = detectDockSide(left, root);
+    settings.ui.dockSide = dockSide;
+    settings.ui.position = dockSide
+        ? getDockedRootPosition(dockSide, top, root)
+        : { left, top };
     settings.ui.placement = 'custom';
     state.suppressNextFabClick = true;
     window.setTimeout(() => {
         state.suppressNextFabClick = false;
     }, 180);
     saveSettingsDebounced();
+    renderAll();
 }
 
 /**
@@ -733,6 +748,8 @@ function renderAll() {
         root.dataset.placement = settings.ui.placement;
         root.classList.toggle('akm-open', Boolean(settings.ui.panelOpen));
         root.classList.toggle('akm-disabled', !settings.enabled);
+        root.classList.toggle('akm-dock-left', settings.ui.dockSide === 'left');
+        root.classList.toggle('akm-dock-right', settings.ui.dockSide === 'right');
         applyRootPosition(root, settings);
     }
 
@@ -1890,6 +1907,7 @@ async function setConsoleEnabled(enabled) {
  * @param {typeof DEFAULT_SETTINGS} settings 扩展设置。
  */
 function applyRootPosition(root, settings) {
+    root.style.setProperty('--akm-dock-offset', `${getDockOffset(root)}px`);
     const position = settings.ui.position;
     if (!position) {
         root.style.left = '';
@@ -1961,6 +1979,56 @@ function updatePanelPlacement(settings) {
     panel.style.width = `${Math.round(panelWidth)}px`;
     panel.style.maxHeight = `${Math.round(panelHeight)}px`;
     panel.style.transformOrigin = `${openRight ? 'left' : 'right'} ${openBelow ? 'top' : 'bottom'}`;
+}
+
+/**
+ * 根据悬浮入口位置判断是否需要吸附到左右侧边。
+ * @param {number} left 当前左侧像素。
+ * @param {HTMLElement} root 悬浮根节点。
+ * @returns {'left'|'right'|null} 侧边吸附方向。
+ */
+function detectDockSide(left, root) {
+    const threshold = window.innerWidth <= 720 ? 18 : 16;
+    const width = Math.max(root.offsetWidth || 58, 58);
+    const rightGap = window.innerWidth - left - width;
+
+    if (left <= threshold) {
+        return 'left';
+    }
+
+    if (rightGap <= threshold) {
+        return 'right';
+    }
+
+    return null;
+}
+
+/**
+ * 生成贴边收缩态的根节点位置，保证入口贴边但仍保留可点击面积。
+ * @param {'left'|'right'} dockSide 侧边方向。
+ * @param {number} top 当前顶部像素。
+ * @param {HTMLElement} root 悬浮根节点。
+ * @returns {{left: number, top: number}} 停靠位置。
+ */
+function getDockedRootPosition(dockSide, top, root) {
+    const margin = 8;
+    const width = Math.max(root.offsetWidth || 58, 58);
+    const clamped = clampRootPosition(0, top, root);
+    return {
+        left: dockSide === 'left' ? margin : Math.max(margin, window.innerWidth - width - margin),
+        top: clamped.top,
+    };
+}
+
+/**
+ * 计算贴边收缩时隐藏到屏幕外的宽度。
+ * @param {HTMLElement} root 悬浮根节点。
+ * @returns {number} 收缩偏移像素。
+ */
+function getDockOffset(root) {
+    const width = Math.max(root.offsetWidth || 58, 58);
+    const maxOffset = window.innerWidth <= 720 ? 24 : 28;
+    return Math.round(Math.min(maxOffset, width * 0.44));
 }
 
 /**
@@ -2087,6 +2155,15 @@ function normalizeSavedPosition(position) {
     }
 
     return { left, top };
+}
+
+/**
+ * 规范化侧边停靠方向，避免异常设置影响悬浮入口布局。
+ * @param {unknown} dockSide 原始停靠方向。
+ * @returns {'left'|'right'|null} 可用停靠方向。
+ */
+function normalizeDockSide(dockSide) {
+    return dockSide === 'left' || dockSide === 'right' ? dockSide : null;
 }
 
 /**
