@@ -56,12 +56,12 @@
     transition:
         background-color 160ms ease,
         border-color 160ms ease,
-        border-radius 220ms ease,
-        height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        min-width 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        padding 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        border-radius 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        height 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        min-width 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        padding 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
         transform 160ms ease,
-        width 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        width 320ms cubic-bezier(0.22, 0.86, 0.36, 1);
     width: 58px;
 }
 
@@ -78,13 +78,13 @@
     transition:
         background-color 240ms ease,
         border-color 220ms ease,
-        border-radius 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        box-shadow 260ms ease,
-        height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        inset 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        opacity 180ms ease,
-        transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        width 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        border-radius 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        box-shadow 320ms ease,
+        height 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        inset 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        opacity 220ms ease,
+        transform 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        width 320ms cubic-bezier(0.22, 0.86, 0.36, 1);
     width: 100%;
     z-index: -1;
 }
@@ -100,9 +100,9 @@
     pointer-events: none;
     position: absolute;
     transition:
-        border-radius 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        inset 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        opacity 220ms ease;
+        border-radius 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        inset 320ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        opacity 260ms ease;
     z-index: -1;
 }
 
@@ -215,6 +215,59 @@
     overflow: hidden;
     padding: 0;
     width: 24px;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        border-radius 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        height 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        min-width 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        padding 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        transform 160ms ease,
+        width 380ms cubic-bezier(0.22, 0.86, 0.36, 1);
+}
+
+/* 唤醒动画：侧条先展开成悬浮球形态，再弹出面板 */
+#akm-root.akm-dock-left.akm-waking .akm-fab,
+#akm-root.akm-dock-right.akm-waking .akm-fab {
+    aspect-ratio: 1;
+    cursor: grab;
+    height: 58px;
+    min-width: 58px;
+    overflow: visible;
+    padding: 0 10px;
+    width: 58px;
+}
+
+#akm-root.akm-dock-left.akm-waking .akm-fab::before,
+#akm-root.akm-dock-right.akm-waking .akm-fab::before {
+    background-color: var(--akm-fab-fill);
+    border: 1px solid var(--akm-border);
+    border-radius: 999px;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
+    height: 100%;
+    inset: 0;
+    opacity: 1;
+    transform: none;
+    width: 100%;
+}
+
+#akm-root.akm-dock-left.akm-waking .akm-fab::after,
+#akm-root.akm-dock-right.akm-waking .akm-fab::after {
+    background:
+        radial-gradient(circle at 70% 24%, color-mix(in srgb, var(--akm-accent) 35%, transparent), transparent 28px),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 58%);
+    border-radius: 999px;
+    inset: 1px;
+    opacity: 0.46;
+}
+
+#akm-root.akm-dock-left.akm-waking .akm-fab-label,
+#akm-root.akm-dock-right.akm-waking .akm-fab-label,
+#akm-root.akm-dock-left.akm-waking .akm-fab-status,
+#akm-root.akm-dock-right.akm-waking .akm-fab-status {
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 220ms ease 80ms, transform 220ms ease 80ms;
 }
 
 #akm-root.akm-dock-left:not(.akm-open) .akm-fab::before,
@@ -226,6 +279,16 @@
     opacity: 1;
     top: 50%;
     transform: translateY(-50%);
+    transition:
+        background-color 240ms ease,
+        border-color 220ms ease,
+        border-radius 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        box-shadow 380ms ease,
+        height 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        inset 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        opacity 220ms ease,
+        transform 380ms cubic-bezier(0.22, 0.86, 0.36, 1),
+        width 380ms cubic-bezier(0.22, 0.86, 0.36, 1);
     width: 7px;
 }
 
@@ -818,7 +881,21 @@
     .akm-fab::after,
     .akm-fab-label,
     .akm-panel,
-    .akm-fab-status {
+    .akm-fab-status,
+    #akm-root.akm-dock-left:not(.akm-open) .akm-fab,
+    #akm-root.akm-dock-right:not(.akm-open) .akm-fab,
+    #akm-root.akm-dock-left:not(.akm-open) .akm-fab::before,
+    #akm-root.akm-dock-right:not(.akm-open) .akm-fab::before,
+    #akm-root.akm-dock-left.akm-waking .akm-fab,
+    #akm-root.akm-dock-right.akm-waking .akm-fab,
+    #akm-root.akm-dock-left.akm-waking .akm-fab::before,
+    #akm-root.akm-dock-right.akm-waking .akm-fab::before,
+    #akm-root.akm-dock-left.akm-waking .akm-fab::after,
+    #akm-root.akm-dock-right.akm-waking .akm-fab::after,
+    #akm-root.akm-dock-left.akm-waking .akm-fab-label,
+    #akm-root.akm-dock-right.akm-waking .akm-fab-label,
+    #akm-root.akm-dock-left.akm-waking .akm-fab-status,
+    #akm-root.akm-dock-right.akm-waking .akm-fab-status {
         animation: none !important;
         transition: none !important;
     }
@@ -832,6 +909,14 @@
     }
 
     .akm-fab {
+        height: 54px;
+        min-width: 54px;
+        width: 54px;
+    }
+
+    /* 移动端唤醒动画使用与桌面端一致的尺寸 */
+    #akm-root.akm-dock-left.akm-waking .akm-fab,
+    #akm-root.akm-dock-right.akm-waking .akm-fab {
         height: 54px;
         min-width: 54px;
         width: 54px;

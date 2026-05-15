@@ -158,7 +158,7 @@ function normalizeProvider(provider) {
 
     return {
         id: String(provider.id || createId()),
-        name: String(provider.name || 'OpenAI 兼容 LLM 服务').trim(),
+        name: String(provider.name || 'OpenAI 兼容服务').trim(),
         baseUrl: String(provider.baseUrl || '').trim(),
         models,
         customModels,
@@ -228,12 +228,12 @@ function ensureNativeWarning() {
     container.insertAdjacentHTML('afterbegin', `
         <section id="akm-api-warning" class="akm-api-warning">
             <div>
-                <strong>LLM 连接已由 ${DISPLAY_NAME} 接管</strong>
-                <span>此页面的 API 连接、模型、密钥与连接档案操作已被屏蔽。请通过悬浮窗打开 LLM 管理控制台。</span>
+                <strong>AI 连接已由 ${DISPLAY_NAME} 管理</strong>
+                <span>此页面的 API 密钥、模型和连接设置已交由悬浮窗统一管理，请通过下方按钮打开。</span>
             </div>
             <button class="akm-text-button" type="button" data-akm-action="open-console">
                 <i class="fa-solid fa-up-right-from-square" aria-hidden="true"></i>
-                <span>打开控制台</span>
+                <span>打开管理面板</span>
             </button>
         </section>
     `);
@@ -464,6 +464,7 @@ function startFloatingDrag(event, handle) {
         dockSide: settings.ui.panelOpen ? null : settings.ui.dockSide,
         awakened: false,
         moved: false,
+        verticalLock: false,
     };
 
     root.classList.add('akm-dragging');
@@ -519,21 +520,40 @@ function moveFloatingDrag(event) {
  */
 function moveDockedHandle(event, root, deltaX, deltaY) {
     const dockSide = state.drag?.dockSide;
-    if (!dockSide) {
+    if (!dockSide || state.drag?.awakened) {
         return;
     }
 
-    const inwardDelta = dockSide === 'left' ? deltaX : -deltaX;
-    if (inwardDelta >= 18 && Math.abs(deltaX) >= Math.max(10, Math.abs(deltaY) * 0.7)) {
-        state.drag.awakened = true;
-        const settings = ensureSettings();
-        settings.ui.panelOpen = true;
-        saveSettingsDebounced();
-        renderAll();
-        event.preventDefault();
-        return;
+    // 纵向拖动的绝对距离，用于判断用户意图
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    // 纵向锁定：一旦用户明显在上下拖动（纵向位移≥12px 且纵向主导），
+    // 就不再触发横向唤醒，避免纵向拖动被误判为唤醒手势。
+    if (!state.drag.verticalLock && absY >= 12 && absY > absX * 1.4) {
+        state.drag.verticalLock = true;
     }
 
+    if (!state.drag.verticalLock) {
+        const inwardDelta = dockSide === 'left' ? deltaX : -deltaX;
+        // 提高唤醒门槛：需要横向位移≥24px 且横向明显主导（至少是纵向的 1.8 倍）
+        if (inwardDelta >= 24 && absX >= Math.max(14, absY * 1.8)) {
+            state.drag.awakened = true;
+            // 先播放侧条展开动画，再打开面板
+            root.classList.add('akm-waking');
+            window.setTimeout(() => {
+                root.classList.remove('akm-waking');
+                const settings = ensureSettings();
+                settings.ui.panelOpen = true;
+                saveSettingsDebounced();
+                renderAll();
+            }, 400);
+            event.preventDefault();
+            return;
+        }
+    }
+
+    // 纵向拖动或贴边位置调整
     const nextPosition = getDockedRootPosition(dockSide, state.drag.startTop + deltaY, root);
     state.drag.currentLeft = nextPosition.left;
     state.drag.currentTop = nextPosition.top;
@@ -566,6 +586,20 @@ function finishFloatingDrag(event) {
     const awakened = Boolean(state.drag.awakened);
     state.drag = null;
     root?.classList.remove('akm-dragging');
+
+    // 即使唤醒了悬浮球，也要保存贴边条的纵向位置，避免下次贴边时复位
+    if (awakened && dockSide) {
+        const settings = ensureSettings();
+        settings.ui.dockSide = dockSide;
+        settings.ui.position = getDockedRootPosition(dockSide, top, root);
+        settings.ui.placement = 'custom';
+        saveSettingsDebounced();
+        state.suppressNextFabClick = true;
+        window.setTimeout(() => {
+            state.suppressNextFabClick = false;
+        }, 180);
+        return;
+    }
 
     if (awakened) {
         state.suppressNextFabClick = true;
@@ -837,7 +871,7 @@ function renderFloatingButton(settings) {
     }
 
     const activeProvider = getActiveProvider();
-    const label = settings.enabled ? (activeProvider ? getShortName(activeProvider.name) : 'L') : 'O';
+    const label = settings.enabled ? (activeProvider ? getShortName(activeProvider.name) : 'AI') : '关';
     const statusClass = !settings.enabled ? 'is-disabled' : activeProvider ? 'is-ready' : 'is-empty';
     button.setAttribute('data-akm-action', 'toggle-panel');
     button.setAttribute('aria-expanded', String(Boolean(settings.ui.panelOpen)));
@@ -861,19 +895,19 @@ function renderPanel(settings) {
         panel.innerHTML = `
             <div class="akm-panel-head">
                 <div>
-                    <span class="akm-kicker">SillyTavern LLM Console</span>
-                    <strong>LLM 管理控制台已停用</strong>
+                    <span class="akm-kicker">AI 模型管理</span>
+                    <strong>AI 模型管理已关闭</strong>
                 </div>
                 <button class="akm-icon-button" type="button" data-akm-action="close-panel" title="关闭">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </div>
             <div class="akm-empty">
-                <strong>原 API 连接页已恢复可用</strong>
-                <span>启用后，本插件会接管 OpenAI-compatible LLM 服务、模型切换、密钥持久化和连接参数。</span>
+                <strong>原 API 设置页已恢复</strong>
+                <span>开启后，这里会帮你统一管理兼容 OpenAI 的 AI 服务，自动保存密钥，一键切换模型。</span>
                 <label class="akm-toggle-row">
                     <input type="checkbox" data-akm-action="toggle-enabled">
-                    <span>启用 LLM 管理控制台</span>
+                    <span>开启 AI 模型管理</span>
                 </label>
             </div>
         `;
@@ -890,8 +924,8 @@ function renderPanel(settings) {
         panel.innerHTML = `
             <div class="akm-panel-head">
                 <div>
-                    <span class="akm-kicker">SillyTavern LLM Console</span>
-                    <strong>${editingProvider ? '编辑 LLM 服务' : '新增 LLM 服务'}</strong>
+                    <span class="akm-kicker">AI 模型管理</span>
+                    <strong>${editingProvider ? '编辑 AI 服务' : '添加 AI 服务'}</strong>
                 </div>
                 <button class="akm-icon-button" type="button" data-akm-action="close-panel" title="关闭">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
@@ -906,18 +940,18 @@ function renderPanel(settings) {
         panel.innerHTML = `
             <div class="akm-panel-head">
                 <div>
-                    <span class="akm-kicker">SillyTavern LLM Console</span>
-                    <strong>LLM 管理控制台</strong>
+                    <span class="akm-kicker">AI 模型管理</span>
+                    <strong>AI 模型管理</strong>
                 </div>
                 <button class="akm-icon-button" type="button" data-akm-action="close-panel" title="关闭">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </div>
             <div class="akm-empty">
-                <strong>尚未添加 LLM 服务</strong>
+                <strong>还没有添加 AI 服务</strong>
                 <button class="akm-text-button" type="button" data-akm-action="new-provider">
                     <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                    <span>新增 LLM 服务</span>
+                    <span>添加 AI 服务</span>
                 </button>
             </div>
         `;
@@ -929,7 +963,7 @@ function renderPanel(settings) {
     panel.innerHTML = `
         <div class="akm-panel-head">
             <div>
-                <span class="akm-kicker">SillyTavern LLM Console</span>
+                <span class="akm-kicker">AI 模型管理</span>
                 <strong>${escapeHtml(activeProvider.name)}</strong>
             </div>
             <button class="akm-icon-button" type="button" data-akm-action="close-panel" title="关闭">
@@ -938,7 +972,7 @@ function renderPanel(settings) {
         </div>
         <div class="akm-panel-fields">
             <label class="akm-field">
-                <span>LLM 服务</span>
+                <span>AI 服务</span>
                 <select id="akm-panel-provider" class="text_pole">${providerOptions}</select>
             </label>
             ${renderModelPicker(activeProvider, 'panel')}
@@ -951,19 +985,19 @@ function renderPanel(settings) {
             <button class="menu_button" type="button" data-akm-action="test-provider" data-provider-id="${escapeAttribute(activeProvider.id)}" title="测试当前模型">
                 <i class="fa-solid fa-vial-circle-check" aria-hidden="true"></i>
             </button>
-            <button class="menu_button" type="button" data-akm-action="refresh-models" data-provider-id="${escapeAttribute(activeProvider.id)}" title="获取模型">
+            <button class="menu_button" type="button" data-akm-action="refresh-models" data-provider-id="${escapeAttribute(activeProvider.id)}" title="刷新模型列表">
                 <i class="fa-solid fa-rotate" aria-hidden="true"></i>
             </button>
-            <button class="menu_button" type="button" data-akm-action="new-provider" title="新增 LLM 服务">
+            <button class="menu_button" type="button" data-akm-action="new-provider" title="添加 AI 服务">
                 <i class="fa-solid fa-plus" aria-hidden="true"></i>
             </button>
-            <button class="menu_button" type="button" data-akm-action="edit-provider" data-provider-id="${escapeAttribute(activeProvider.id)}" title="编辑 LLM 服务">
+            <button class="menu_button" type="button" data-akm-action="edit-provider" data-provider-id="${escapeAttribute(activeProvider.id)}" title="编辑 AI 服务">
                 <i class="fa-solid fa-pen" aria-hidden="true"></i>
             </button>
-            <button class="menu_button" type="button" data-akm-action="delete-provider" data-provider-id="${escapeAttribute(activeProvider.id)}" title="删除 LLM 服务">
+            <button class="menu_button" type="button" data-akm-action="delete-provider" data-provider-id="${escapeAttribute(activeProvider.id)}" title="删除 AI 服务">
                 <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
             </button>
-            <button class="menu_button" type="button" data-akm-action="focus-settings" title="打开配置">
+            <button class="menu_button" type="button" data-akm-action="focus-settings" title="打开设置">
                 <i class="fa-solid fa-sliders" aria-hidden="true"></i>
             </button>
         </div>
@@ -988,31 +1022,31 @@ function renderSettings(settings) {
     container.innerHTML = `
         <div class="akm-settings-head">
             <div>
-                <h3>SillyTavern LLM 管理控制台</h3>
-                <span>当前仅接管 OpenAI-compatible · ${settings.providers.length} 个 LLM 服务</span>
+                <h3>AI 模型管理</h3>
+                <span>管理兼容 OpenAI 的 AI 服务 · ${settings.providers.length} 个服务</span>
             </div>
             <div class="akm-settings-actions">
-                <label class="akm-switch" title="${settings.enabled ? '停用控制台接管' : '启用控制台接管'}">
+                <label class="akm-switch" title="${settings.enabled ? '关闭 AI 模型管理' : '开启 AI 模型管理'}">
                     <input type="checkbox" data-akm-action="toggle-enabled" ${settings.enabled ? 'checked' : ''}>
                     <span></span>
                 </label>
-                <button class="akm-icon-button" type="button" data-akm-action="toggle-settings" title="${collapsed ? '展开配置' : '折叠配置'}" aria-expanded="${String(!collapsed)}">
+                <button class="akm-icon-button" type="button" data-akm-action="toggle-settings" title="${collapsed ? '展开设置' : '收起设置'}" aria-expanded="${String(!collapsed)}">
                     <i class="fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'}" aria-hidden="true"></i>
                 </button>
                 <button class="akm-text-button" type="button" data-akm-action="new-provider">
                     <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                    <span>新增</span>
+                    <span>添加</span>
                 </button>
             </div>
         </div>
         ${collapsed ? '' : `
             <div class="akm-console-note ${settings.enabled ? 'is-enabled' : 'is-disabled'}">
-                <strong>${settings.enabled ? '控制台已接管原 API 连接页' : '控制台已停用'}</strong>
-                <span>${settings.enabled ? 'URL 与 API Key 会持久化保存；模型、后处理与附加参数从悬浮控制台统一切换。' : '停用后原 API 连接页恢复，插件不会拦截原连接操作。'}</span>
+                <strong>${settings.enabled ? '已接管原 API 设置页' : 'AI 模型管理已关闭'}</strong>
+                <span>${settings.enabled ? '服务地址和密钥自动保存，模型和参数都从这里统一管理。' : '关闭后恢复原 API 设置页，不再拦截原有配置。'}</span>
             </div>
             <div class="akm-settings-grid">
-                <div class="akm-provider-list" aria-label="LLM 服务列表">
-                    ${providerRows || '<div class="akm-list-empty">暂无 LLM 服务</div>'}
+                <div class="akm-provider-list" aria-label="AI 服务列表">
+                    ${providerRows || '<div class="akm-list-empty">暂无 AI 服务</div>'}
                 </div>
                 ${form}
             </div>
@@ -1030,16 +1064,16 @@ function renderProviderRow(provider, activeProviderId) {
     const active = provider.id === activeProviderId;
     const modelCount = Array.isArray(provider.models) ? provider.models.length : 0;
     const status = provider.lastTestStatus === 'success'
-        ? '已测试'
+        ? '已通过测试'
         : provider.modelFetchError
-            ? '模型获取失败'
+            ? '获取模型列表失败'
             : `${modelCount} 个模型`;
 
     return `
         <div class="akm-provider-row ${active ? 'is-active' : ''}">
             <button type="button" data-akm-action="activate-provider" data-provider-id="${escapeAttribute(provider.id)}">
                 <strong>${escapeHtml(provider.name)}</strong>
-                <span>${escapeHtml(provider.activeModel || '未选择模型')} · ${escapeHtml(status)}</span>
+                <span>${escapeHtml(provider.activeModel || '未选择')} · ${escapeHtml(status)}</span>
             </button>
             <button class="akm-icon-button" type="button" data-akm-action="edit-provider" data-provider-id="${escapeAttribute(provider.id)}" title="编辑">
                 <i class="fa-solid fa-pen" aria-hidden="true"></i>
@@ -1055,8 +1089,8 @@ function renderProviderRow(provider, activeProviderId) {
  */
 function renderProviderForm(provider, scope = 'settings') {
     const editing = Boolean(provider);
-    const title = editing ? '编辑 LLM 服务' : '新增 LLM 服务';
-    const submitText = editing ? '保存并获取模型' : '添加并获取模型';
+    const title = editing ? '编辑 AI 服务' : '添加 AI 服务';
+    const submitText = editing ? '保存并刷新模型' : '添加并刷新模型';
     const suffix = scope === 'panel' ? 'panel' : 'settings';
     const newFormGuard = editing ? '' : 'readonly data-akm-autofill-lock="true"';
     const promptOptions = renderPromptPostProcessingOptions(provider?.promptPostProcessing || custom_prompt_post_processing_types.NONE);
@@ -1064,7 +1098,7 @@ function renderProviderForm(provider, scope = 'settings') {
         ? renderModelPicker(provider, suffix)
         : `
             <div class="akm-model-empty">
-                保存 LLM 服务后会自动请求模型列表；模型名无需手动填写。
+                保存 AI 服务后会自动获取模型列表，无需手动填写模型名。
             </div>
         `;
 
@@ -1072,24 +1106,24 @@ function renderProviderForm(provider, scope = 'settings') {
         <form id="akm-provider-form-${suffix}" class="akm-provider-form" data-akm-provider-form="true" data-akm-form-scope="${escapeAttribute(suffix)}" data-editing-id="${escapeAttribute(provider?.id || '')}">
             <div class="akm-form-title">
                 <h4>${title}</h4>
-                ${editing ? `<span>${escapeHtml(provider.secretLabel || '已保存密钥')}</span>` : '<span>API Key 不会写入插件配置</span>'}
+                ${editing ? `<span>${escapeHtml(provider.secretLabel || '已保存密钥')}</span>` : '<span>密钥不会保存在插件配置中</span>'}
             </div>
             <label class="akm-field">
                 <span>服务名称</span>
                 <input id="akm-provider-name-${suffix}" class="text_pole" name="name" value="${escapeAttribute(provider?.name || '')}" autocomplete="off" required>
             </label>
             <label class="akm-field">
-                <span>Base URL</span>
-                <input id="akm-provider-base-url-${suffix}" class="text_pole" name="baseUrl" value="${escapeAttribute(provider?.baseUrl || '')}" placeholder="https://example.com/v1" autocomplete="${editing ? 'off' : 'new-password'}" ${newFormGuard} required>
+                <span>服务地址（Base URL）</span>
+                <input id="akm-provider-base-url-${suffix}" class="text_pole" name="baseUrl" value="${escapeAttribute(provider?.baseUrl || '')}" placeholder="https://api.example.com/v1" autocomplete="${editing ? 'off' : 'new-password'}" ${newFormGuard} required>
             </label>
             ${modelArea}
             <details class="akm-advanced">
                 <summary>
-                    <span>原版兼容参数</span>
+                    <span>高级参数</span>
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </summary>
                 <label class="akm-field">
-                    <span>提示词后处理</span>
+                    <span>消息格式处理</span>
                     <select class="text_pole" name="promptPostProcessing">
                         ${promptOptions}
                     </select>
@@ -1109,7 +1143,7 @@ function renderProviderForm(provider, scope = 'settings') {
             </details>
             <label class="akm-field">
                 <span>API Key</span>
-                <input id="akm-provider-api-key-${suffix}" class="text_pole" name="apiKey" value="" type="password" autocomplete="new-password" placeholder="${editing ? '留空则沿用已保存密钥' : '仅用于写入 SillyTavern secrets'}" ${newFormGuard} ${editing ? '' : 'required'}>
+                <input id="akm-provider-api-key-${suffix}" class="text_pole" name="apiKey" value="" type="password" autocomplete="new-password" placeholder="${editing ? '留空则沿用已保存的密钥' : '输入你的 API 密钥'}" ${newFormGuard} ${editing ? '' : 'required'}>
             </label>
             <div class="akm-form-actions">
                 <button class="akm-text-button" type="submit">
@@ -1123,7 +1157,7 @@ function renderProviderForm(provider, scope = 'settings') {
                 ${editing ? `
                     <button class="akm-text-button" type="button" data-akm-action="refresh-models" data-provider-id="${escapeAttribute(provider.id)}">
                         <i class="fa-solid fa-rotate" aria-hidden="true"></i>
-                        <span>获取模型</span>
+                        <span>刷新模型</span>
                     </button>
                 ` : ''}
                 ${editing ? `
@@ -1165,14 +1199,14 @@ function renderModelPicker(provider, scope) {
 
     const empty = provider?.modelFetchError
         ? escapeHtml(provider.modelFetchError)
-        : '尚未获取模型。点击“获取模型”，或先添加自定义模型名。';
+        : '还没有模型列表，请点击“刷新模型”或手动添加模型名。';
 
     return `
         <div class="akm-field akm-model-field">
             <span>${title}</span>
             <div class="akm-current-model ${activeModel ? '' : 'is-empty'}">
                 ${loading ? '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>' : '<i class="fa-solid fa-cube" aria-hidden="true"></i>'}
-                <strong>${escapeHtml(activeModel || '未选择模型')}</strong>
+                <strong>${escapeHtml(activeModel || '未选择')}</strong>
             </div>
             ${models.length > 0 ? `
                 <div class="akm-model-box" role="listbox" aria-label="模型列表">
@@ -1214,12 +1248,12 @@ function renderProviderStatus(provider) {
  */
 function renderPromptPostProcessingOptions(current) {
     const options = [
-        [custom_prompt_post_processing_types.NONE, '不处理'],
+        [custom_prompt_post_processing_types.NONE, '保持原样'],
         [custom_prompt_post_processing_types.MERGE, '合并系统提示词'],
-        [custom_prompt_post_processing_types.MERGE_TOOLS, '合并系统提示词与工具'],
-        [custom_prompt_post_processing_types.SEMI, '半严格'],
+        [custom_prompt_post_processing_types.MERGE_TOOLS, '合并提示词与工具'],
+        [custom_prompt_post_processing_types.SEMI, '半严格模式'],
         [custom_prompt_post_processing_types.SEMI_TOOLS, '半严格 + 工具'],
-        [custom_prompt_post_processing_types.STRICT, '严格'],
+        [custom_prompt_post_processing_types.STRICT, '严格模式'],
         [custom_prompt_post_processing_types.STRICT_TOOLS, '严格 + 工具'],
         [custom_prompt_post_processing_types.SINGLE, '单条系统提示词'],
     ];
@@ -1253,7 +1287,7 @@ async function saveProviderFromForm(form, options = {}) {
     const excludeBody = String(formData.get('excludeBody') || '').trim();
 
     if (!name || !baseUrl) {
-        notify('请填写 LLM 服务名称和 Base URL。', 'warning');
+        notify('请填写服务名称和服务地址。', 'warning');
         return;
     }
 
@@ -1275,7 +1309,7 @@ async function saveProviderFromForm(form, options = {}) {
         secretLabel = `API Key 管家 / ${name}`;
         const newSecretId = await writeSecret(SECRET_KEYS.CUSTOM, apiKey, secretLabel);
         if (!newSecretId) {
-            notify('API Key 写入失败。', 'error');
+            notify('密钥保存失败，请重试。', 'error');
             return;
         }
 
@@ -1336,7 +1370,7 @@ async function saveProviderFromForm(form, options = {}) {
         if (ensureSettings().enabled) {
             await applyProvider(getProviderById(provider.id), 'save-provider');
         }
-        notify('LLM 服务已保存，已尝试获取模型列表。', 'success');
+        notify('AI 服务已保存，已尝试刷新模型列表。', 'success');
     }
 
     if (formScope === 'panel') {
@@ -1374,7 +1408,7 @@ async function testCurrentModel(providerId) {
     const testedModel = testProvider.activeModel;
 
     if (!testedModel) {
-        notify('请先选择模型，或添加自定义模型名后再测试。', 'warning');
+        notify('请先选择一个模型，或手动添加模型名后再测试。', 'warning');
         return;
     }
 
@@ -1396,8 +1430,8 @@ async function testCurrentModel(providerId) {
 
     current.lastTestStatus = result.ok ? 'success' : 'error';
     current.lastTestMessage = result.ok
-        ? `当前模型测试成功：${testedModel}`
-        : `当前模型测试失败：${result.message}`;
+        ? `模型测试通过：${testedModel}`
+        : `模型测试失败：${result.message}`;
     current.updatedAt = new Date().toISOString();
     saveSettingsDebounced();
 
@@ -1489,11 +1523,11 @@ async function requestCurrentModelCompletion(provider) {
 async function refreshProviderModels(providerId, options = {}) {
     const provider = getProviderById(providerId);
     if (!provider) {
-        return { ok: false, count: 0, message: '未找到服务商。' };
+        return { ok: false, count: 0, message: '未找到该 AI 服务。' };
     }
 
     if (!provider.baseUrl || !provider.secretId) {
-        const message = '请先保存 Base URL 和 API Key。';
+        const message = '请先保存服务地址和 API Key。';
         provider.modelFetchError = message;
         saveSettingsDebounced();
         renderAll();
@@ -1526,10 +1560,10 @@ async function refreshProviderModels(providerId, options = {}) {
         const payload = await response.json();
         const models = extractModelIds(payload);
         if (payload?.error && models.length === 0) {
-            throw new Error('服务商返回错误，未获取到模型。');
+            throw new Error('服务返回错误，未能获取模型列表。');
         }
         if (models.length === 0) {
-            throw new Error('连接已返回，但响应中没有模型列表。');
+            throw new Error('已连接服务，但响应中没有模型列表。');
         }
 
         const currentProvider = getProviderById(provider.id);
@@ -1567,7 +1601,7 @@ async function refreshProviderModels(providerId, options = {}) {
             currentProvider.updatedAt = new Date().toISOString();
         }
         saveSettingsDebounced();
-        notify(`模型获取失败：${message}`, 'error');
+        notify(`获取模型列表失败：${message}`, 'error');
         return { ok: false, count: 0, message };
     } finally {
         state.modelRequests.delete(provider.id);
@@ -1609,7 +1643,7 @@ async function activateModel(model, providerId = null) {
     }
 
     if (Array.isArray(provider.models) && provider.models.length > 0 && !provider.models.includes(value)) {
-        notify('模型不在已获取列表中，请先重新获取模型。', 'warning');
+        notify('该模型不在已获取的列表中，请先刷新模型列表。', 'warning');
         return;
     }
 
@@ -1631,7 +1665,7 @@ async function activateModel(model, providerId = null) {
 async function addCustomModel(providerId, sourceElement) {
     const provider = getProviderById(providerId);
     if (!provider) {
-        notify('请先保存 LLM 服务，再添加自定义模型。', 'warning');
+        notify('请先保存 AI 服务，再添加自定义模型。', 'warning');
         return;
     }
 
@@ -1643,7 +1677,7 @@ async function addCustomModel(providerId, sourceElement) {
 
     const model = input.value.trim();
     if (!model) {
-        notify('请输入自定义模型名。', 'warning');
+        notify('请输入模型名称。', 'warning');
         return;
     }
 
@@ -1659,7 +1693,7 @@ async function addCustomModel(providerId, sourceElement) {
         await applyProvider(provider, 'add-custom-model');
     }
 
-    notify('自定义模型已加入列表并切换。', 'success');
+    notify('模型已添加并切换。', 'success');
     renderAll();
 }
 
@@ -1674,7 +1708,7 @@ async function deleteProvider(providerId) {
         return;
     }
 
-    const confirmed = await confirmAction('删除 LLM 服务', `确定删除「${provider.name}」吗？`);
+    const confirmed = await confirmAction('删除 AI 服务', `确定要删除「${provider.name}」吗？`);
     if (!confirmed) {
         return;
     }
@@ -1696,7 +1730,7 @@ async function deleteProvider(providerId) {
         clearManagedConnection('delete-last-provider');
     }
 
-    notify('LLM 服务已删除。', 'success');
+    notify('AI 服务已删除。', 'success');
     renderAll();
 }
 
@@ -1753,7 +1787,7 @@ async function applyProvider(provider, reason) {
         saveSettingsDebounced();
     } catch (error) {
         console.error(`[${DISPLAY_NAME}] 应用服务商失败：${reason}`, error);
-        notify('LLM 服务应用失败，请查看浏览器控制台。', 'error');
+        notify('AI 服务应用失败，请查看浏览器控制台。', 'error');
     } finally {
         state.pluginApplying = false;
         document.getElementById('akm-root')?.classList.remove('akm-applying');
@@ -1921,6 +1955,20 @@ function togglePanel() {
  */
 function setPanelOpen(open) {
     const settings = ensureSettings();
+    const root = document.getElementById('akm-root');
+
+    // 从贴边状态唤醒时，先播放侧条→悬浮球的形态展开动画，再弹出面板
+    if (open && settings.ui.dockSide && !settings.ui.panelOpen && root) {
+        root.classList.add('akm-waking');
+        window.setTimeout(() => {
+            root.classList.remove('akm-waking');
+            settings.ui.panelOpen = true;
+            saveSettingsDebounced();
+            renderAll();
+        }, 400);
+        return;
+    }
+
     settings.ui.panelOpen = open;
     saveSettingsDebounced();
     renderAll();
@@ -1939,7 +1987,7 @@ async function setConsoleEnabled(enabled) {
     if (!settings.enabled) {
         state.panelEditorOpen = false;
         restoreNativeManagers();
-        notify('LLM 管理控制台已停用，原 API 连接页已恢复。', 'info');
+        notify('AI 模型管理已关闭，原 API 设置页已恢复。', 'info');
         renderAll();
         return;
     }
@@ -1949,7 +1997,7 @@ async function setConsoleEnabled(enabled) {
     if (activeProvider) {
         await applyProvider(activeProvider, 'enable-console');
     }
-    notify('LLM 管理控制台已启用，原 API 连接页已接管。', 'success');
+    notify('AI 模型管理已开启，原 API 设置页已接管。', 'success');
     renderAll();
 }
 
@@ -2187,7 +2235,11 @@ function installManagedInfoToastFilter() {
     window.toastr.info = (message, title, optionsOverride) => {
         const normalizedMessage = String(message || '');
         const normalizedTitle = String(title || '');
-        if (normalizedTitle === DISPLAY_NAME && normalizedMessage.includes('连接与密钥已由 API Key 管家接管')) {
+        const managedConnectionMessages = [
+            '连接与密钥已由 API Key 管家接管',
+            '连接与密钥已由 API Key 管家管理',
+        ];
+        if (normalizedTitle === DISPLAY_NAME && managedConnectionMessages.some(text => normalizedMessage.includes(text))) {
             return null;
         }
 
@@ -2320,7 +2372,7 @@ async function fetchWithTimeout(url, options, timeoutMs, label) {
         });
     } catch (error) {
         if (timedOut || error?.name === 'AbortError') {
-            throw new Error(`${label}超时，请检查 Base URL、网络状态或服务商响应。`);
+            throw new Error(`${label}超时，请检查服务地址、网络状态或服务响应。`);
         }
         throw error;
     } finally {
@@ -2341,7 +2393,7 @@ function validateManagedIncludeBody(includeBody) {
 
     return {
         ok: false,
-        message: `附加请求体不能覆盖 ${matchedKeys.join('、')}。这些字段由 LLM 管理控制台托管，请通过模型选择或对应参数修改。`,
+        message: `附加请求体不能覆盖 ${matchedKeys.join('、')}。这些字段由 AI 模型管理托管，请通过模型选择或对应参数修改。`,
     };
 }
 
